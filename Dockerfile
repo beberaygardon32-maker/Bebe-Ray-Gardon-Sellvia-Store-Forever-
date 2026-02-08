@@ -1,5 +1,5 @@
 # Stage 1: Build the Application
-# We use node:18 as the base for building and installing dependencies.
+# We use node:18 as the base image for building and installing dependencies.
 FROM node:18 AS build
 
 # Set the working directory inside the container
@@ -10,29 +10,36 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application source code
 COPY . .
 
-# Stage 2: Create the Final Production Image
-# We use node:18 as the runtime image with all the necessary tools.
+# Run any build or preparation scripts (if needed for a production build)
+# Uncomment below if you have a build step like `npm run build` in your app
+# RUN npm run build
+
+# Stage 2: Production Image
+# Use node:18 as the runtime image with minimal dependencies for running the app.
 FROM node:18
 
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Copy the node_modules and built application files from the 'build' stage
+# Copy node_modules and application files from the 'build' stage
 COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY --from=build /usr/src/app/package*.json ./
 COPY --from=build /usr/src/app .
 
-# Expose the port your app runs on
+# Set environment variables
+ENV NODE_ENV=production
 ENV PORT=8080
+
+# Expose the application port
 EXPOSE $PORT
 
-# Run the application using the non-root user (recommended for security)
+# Use a non-root user for running the container
 USER node
 
-# Define the command to start your application
+# Command to start the application
 CMD [ "node", "index.js" ]
