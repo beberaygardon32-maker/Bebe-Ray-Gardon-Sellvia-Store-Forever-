@@ -43,3 +43,24 @@ USER node
 
 # Command to start the application
 CMD [ "node", "index.js" ]
+
+# fly.toml app configuration file generated for beberaygardonsellviastore on 2026-02-08T20:35:12Z
+
+app = "beberaygardonsellviastore"
+primary_region = "ord"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024
