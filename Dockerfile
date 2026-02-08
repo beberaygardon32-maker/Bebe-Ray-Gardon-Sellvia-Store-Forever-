@@ -1,66 +1,49 @@
 # Stage 1: Build the Application
-# We use node:18 as the base image for building and installing dependencies.
-FROM node:18 AS build
+# We use python:3.9 as the base for building and installing dependencies.
+FROM python:3.9 AS build
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json first to leverage Docker caching.
-# If these files don't change, subsequent builds can skip 'npm install'.
-COPY package*.json ./
+# Install system dependencies if needed
+RUN apt-get update && apt-get install -y --no-install-recommends     build-essential     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN npm install --legacy-peer-deps
+# Create a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements.txt if it exists (using wildcard to avoid build failure)
+COPY requirements.tx[t] ./requirements.txt
+
+# Install Python dependencies only if requirements.txt exists
+RUN pip install --upgrade pip &&     if [ -f requirements.txt ]; then         pip install -r requirements.txt;     fi
 
 # Copy the rest of the application source code
 COPY . .
 
-# Run any build or preparation scripts (if needed for a production build)
-# Uncomment below if you have a build step like `npm run build` in your app
-# RUN npm run build
-
-# Stage 2: Production Image
-# Use node:18 as the runtime image with minimal dependencies for running the app.
-FROM node:18
+# Stage 2: Create the Final Production Image
+# We use python:3.9 as the runtime image with all the necessary tools.
+FROM python:3.9
 
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Copy node_modules and application files from the 'build' stage
-COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/package*.json ./
+# Copy the virtual environment from the build stage
+COPY --from=build /opt/venv /opt/venv
+
+# Copy the application code
 COPY --from=build /usr/src/app .
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=8080
+# Set the virtual environment as the active Python environment
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Expose the application port
+# Create a non-root user to run the application
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /usr/src/app
+USER appuser
+
+# Expose the port your app runs on
+ENV PORT=8080
 EXPOSE $PORT
 
-# Use a non-root user for running the container
-USER node
-
-# Command to start the application
-CMD [ "node", "index.js" ]
-
-# fly.toml app configuration file generated for beberaygardonsellviastore on 2026-02-08T20:35:12Z
-
-app = "beberaygardonsellviastore"
-primary_region = "ord"
-
-[build]
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = "stop"
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ["app"]
-
-[[vm]]
-  memory = "1gb"
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 1024
+# Define the command to start your application
+CMD ["python", "app.py"]
